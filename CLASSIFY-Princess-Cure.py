@@ -112,9 +112,9 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import learning_curve
 
 clf_svm = clf_svm.fit(X_train, y_train)
-SVM = clf_svm.best_estimator_
+SVC = clf_svm.best_estimator_
 
-train_sizes, train_scores, test_scores = learning_curve(estimator=SVM,
+train_sizes, train_scores, test_scores = learning_curve(estimator=SVC,
                                              X=X_train,
                                              y=y_train,
                                              train_sizes=np.linspace(0.1, 1.0, 10),
@@ -154,6 +154,28 @@ plt.tight_layout()
 plt.show()
 #%%
 ### Curva de validacion
+
+#%%
+### Seleccion de caracteristicas
+
+clf_rfc = clf_rfc.fit(X_train, y_train)
+forest = clf_rfc.best_estimator_
+
+importances = forest.feature_importances_
+indices = np.argsort(importances)[::-1]
+
+plt.title('Importancia de ingredientes')
+
+plt.bar(range(indices.size), 
+        importances[indices],
+        align='center')
+
+plt.xticks(ticks=range(indices.size),
+           labels=df.columns[:-1],
+           rotation=90)
+
+plt.tight_layout()
+plt.show()
 
 #%%
 
