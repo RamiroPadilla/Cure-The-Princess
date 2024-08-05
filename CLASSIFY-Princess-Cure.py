@@ -39,7 +39,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                     random_state=0) 
 
 #%%
-### Seleccion de modelo: Support Vector Classifier (SVM) ###
+### Seleccion de modelo: Support Vector Classifier (SVC) ###
 
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -47,7 +47,7 @@ from sklearn.svm import SVC
 from sklearn.model_selection import cross_val_score, KFold, GridSearchCV
 
 p_svc = make_pipeline(StandardScaler(),
-                             SVC(random_state=1))
+                             SVC(random_state=1, probability=True))
 
 param_range = [0.001, 0.1, 1 , 10, 100, 1000]
 
@@ -57,24 +57,24 @@ param_grid = [{'svc__C' : param_range,
               'svc__gamma' : [1, 0.1 ,0.01, 0.001, 0.0001],
               'svc__kernel' : ['rbf']}]
 
-inner_cv = KFold(n_splits=4, shuffle=True, random_state=2)
-outer_cv = KFold(n_splits=4, shuffle=True, random_state=2)
+inner_cv = KFold(n_splits=2, shuffle=True, random_state=2)
+outer_cv = KFold(n_splits=5, shuffle=True, random_state=2)
 
 # bucle interior
-clf_svm = GridSearchCV(estimator=p_svc, 
+clf_svc = GridSearchCV(estimator=p_svc, 
                    param_grid=param_grid,
                    scoring='accuracy',
                    cv=inner_cv,
                    n_jobs=3) # 3 nucleos del CPU
 
 # bucle exterior, 
-scores_svm = cross_val_score(clf_svm, X_train, y_train,
+scores_svc = cross_val_score(clf_svc, X_train, y_train,
                          scoring='accuracy',
                          cv=outer_cv,
                          n_jobs=3)
 
-CV_accuracy_svm = np.mean(scores_svm)
-CV_acc_std_svm = np.std(scores_svm)
+CV_accuracy_svm = np.mean(scores_svc)
+CV_acc_std_svm = np.std(scores_svc)
 
 #%%
 ### Seleccion de modelo: Random Forest Classifier ###
@@ -111,10 +111,10 @@ CV_acc_std_rfc = np.std(scores_rfc)
 import matplotlib.pyplot as plt
 from sklearn.model_selection import learning_curve
 
-clf_svm = clf_svm.fit(X_train, y_train)
-SVC = clf_svm.best_estimator_
+clf_svc = clf_svc.fit(X_train, y_train)
+best_SVC = clf_svc.best_estimator_
 
-train_sizes, train_scores, test_scores = learning_curve(estimator=SVC,
+train_sizes, train_scores, test_scores = learning_curve(estimator=best_SVC,
                                              X=X_train,
                                              y=y_train,
                                              train_sizes=np.linspace(0.1, 1.0, 10),
@@ -178,47 +178,54 @@ plt.tight_layout()
 plt.show()
 
 #%%
+### Entrenamiento modelo final ###
 
-# ### Entrenamiento modelo final ###
+y_pred_train = best_SVC.predict(X_train)
+y_pred_test = best_SVC.predict(X_test)
 
-# final_svm = SVC(**best_params, probability=True) # paso los mejores parametros como keywords arguments
-# final_svm.fit(X_train_sd, y_train_1d)
+final_report = classification_report(y_test, y_pred_test)
+print(final_report)
 
+# Precision = cuan utiles son los resultados de busqueda
+# Recall = cuan completos son los resultados
 
-# y_pred_train = final_svm.predict(X_train_sd)
-# y_pred_test = final_svm.predict(X_test_sd)
-
-
-# # Resultados del mejor modelo
-# final_report = classification_report(y_test, y_pred_test)
-# print(final_report)
-# # Precision = cuan utiles son los resultados de busqueda
-# # Recall = cuan completos son los resultados
-
-# ##### f1_score_test = 96% #####
+##### f1_score_test = 96% #####
 
 #%%
+## Cuva ROC ###
 
-### Cuva ROC ###
+y_prob_1 = best_SVC.predict_proba(X_test)[:,-1] # probabilidades de target = 1 (positivas)
 
-# y_prob_1 = final_svm.predict_proba(X_test_sd)[:,-1] # probabilidades de target = 1 (positivas)
+fpr, tpr, thresholds = roc_curve(y_test, y_prob_1)
+# fpr = FP / (FP + TN)
+# tpr = TP / (TP + FN)
+roc_auc = auc(fpr, tpr) # Area Under the Curve
 
-# fpr, tpr, thresholds = roc_curve(y_test, y_prob_1)
-# # fpr = FP / (FP + TN)
-# # tpr = TP / (TP + FN)
-# roc_auc = auc(fpr, tpr) # Area Under the Curve
+plt.figure()
+plt.plot(fpr, tpr,
+         color='darkorange',
+         lw=2,
+         label=f'Curva ROC (área = {roc_auc:.2f})')
 
+plt.plot([0, 1],
+         [0, 1],
+         color='navy',
+         lw=2,
+         linestyle=':',
+         label='Adivinacion aleatoria')
 
-# plt.figure()
-# plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'Curva ROC (área = {roc_auc:.2f})')
-# plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-# plt.xlim([0.0, 1.0])
-# plt.ylim([0.0, 1.05])
-# plt.xlabel('Tasa de Falsos Positivos')
-# plt.ylabel('Tasa de Verdaderos Positivos')
-# plt.title('Curva ROC')
-# plt.legend(loc='lower right')
-# plt.show()
+plt.plot([0, 0, 1], [0, 1, 1],
+         color='black',
+         lw=1,
+         linestyle=':',
+         label='Perfomance perfecta')
 
+plt.xlim([-0.05, 1.05])
+plt.ylim([-0.05, 1.05])
+plt.xlabel('Tasa de Falsos Positivos')
+plt.ylabel('Tasa de Verdaderos Positivos')
+plt.title('Curva ROC')
+plt.legend(loc='lower right')
+plt.show()
 
-
+# %%
